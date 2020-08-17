@@ -26,7 +26,6 @@ process.stdin.on("data", data => {
     const output = revertStr(data);
 
     process.stdout.write("> " + output + "\n");
-    // return process.exit();
 });
 
 
