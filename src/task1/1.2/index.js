@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const csv = require("csvtojson");
+const { pipeline } = require('stream');
 
 
 /**
@@ -49,10 +50,15 @@ const writeJson = (file, content) => {
 
 
 /**
- * Call csv() package and start the read/write
+ * Create a pipeline to read and write file
  */
-csv(csvOptions)
-    .fromFile(srcFile)
-    .then(data => { 
-        writeJson(newFile, data);
-    });
+pipeline(
+    fs.createReadStream(srcFile),
+    csv(csvOptions),
+    fs.createWriteStream(newFile),
+    err => {
+        err
+            ? process.stdout.write("Pipeline failed!\n")
+            : process.stdout.write("The file has been saved!\n");
+    }
+);
