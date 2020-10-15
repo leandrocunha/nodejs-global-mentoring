@@ -5,10 +5,6 @@ const Joi = require("joi");
 const { Client } = require("pg");
 const { DataTypes, Model, Sequelize } = require("sequelize");
 
-const generateId = require("./utils/generateID");
-const findIndexById = require("./utils/findIndexById");
-const filterByLogin = require("./utils/filterByLogin");
-
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -58,7 +54,8 @@ queryInterface.createTable('User', {
   uuid: {
     type: DataTypes.UUID,
     defaultValue: Sequelize.UUIDV4,
-    allowNull: false
+    allowNull: false,
+    primaryKey: true
   },
   login: {
     type: DataTypes.STRING,
@@ -106,8 +103,8 @@ const User = sequelize.define('User',
       type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
-        max: 4,
-        min: 130,
+        min: 4,
+        max: 130,
       }
     },
     isDeleted: {
@@ -134,56 +131,70 @@ app.get("/users", (req, res) => {
     })
     .catch(error => {
       console.log(error);
-      res.status(404).send(error)
+      res.status(500).send(error)
     });
 });
 
-app.get("/users/:id", (req, res) => {
-  const { id } = req.params;
-  const _index = findIndexById(resource, id);
+app.get("/users/:uuid", (req, res) => {
+  const { uuid } = req.params;
+  console.log(uuid);
 
-  res.send(resource[_index]);
+  User
+    .findOne({ where: { uuid } })
+    .then(result => res.send(result))
+    .catch(error => {
+      console.log(error);
+      res.status(500).send(error);
+    })
 });
 
 app.post("/users", (req, res) => {
+  const user = req.body;
+
+  User
+    .create({ ...user })
+    .then(result => res.send(result))
+    .catch(error => {
+      console.log(error);
+      res.status(500).send(error)
+    });
+});
+
+app.put("/users/:uuid", (req, res) => {
+  const { uuid } = req.params;
   const formData = req.body;
-  const user = { uuid: generateId(), ...formData, isDeleted: false };
-  const { value, error } = userSchema.validate(user);
 
-  if (error) {
-    return res.status(400).send(error.message);
-  }
-
-  resource.push({ uuid: generateId(), ...user, isDeleted: false });
-  res.send("User added successfully!");
+  User
+    .update({ ...formData }, { where: { uuid } })
+    .then(() => res.send("User updated successfully!"))
+    .catch(error => {
+      console.log(error);
+      res.status(500).send(error)
+    });
 });
 
-app.put("/users/:id", (req, res) => {
-  const { id } = req.params;
-  const new_user = req.body;
-  const _index = findIndexById(resource, id);
-  const { value, error } = userSchema.validate(new_user);
-
-  if (error) {
-    return res.status(400).send(error.message);
-  }
-
-  resource.splice(_index, 1, { ...resource[_index], ...new_user });
-  res.send("User update successfully!");
-});
-
-app.delete("/users/:id", (req, res) => {
-  const { id } = req.params;
-  const _index = findIndexById(resource, id);
-
-  resource.splice(_index, 1, { ...resource[_index], isDeleted: true });
-  res.send("User deleted successfully!");
+app.delete("/users/:uuid", (req, res) => {
+  const { uuid } = req.params;
+  
+  User
+    .destroy({ where: { uuid } })
+    .then(() => res.send("User deleted successfully!"))
+    .catch(error => res.status(500).send(error));
 });
 
 app.get("/autosuggest", (req, res) => {
   const { limit, query } = req.body;
 
-  res.send(filterByLogin(resource, query, limit));
+  User
+    .findAll({
+      where: { login: { [Sequelize.Op.like]: `%${query}%` } },
+      limit
+    })
+    .then(result => res.send(result))
+    .catch(error => {
+      console.log(error);
+      res.status(500).send(error)
+    });
 });
 
 app.listen(port, () => console.log(`Server listening on port ${port}`));
